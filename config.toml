@@ -1,0 +1,2 @@
+ollama_url = "http://dd.local:11434"
+model = "qwen3:8b"
