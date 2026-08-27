@@ -12,9 +12,9 @@ echo "╚═══════════════════════�
 echo ""
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Helpers
-# ------------------------------------------------------------
+# ============================================================
 
 info() {
     echo "  → $1"
@@ -37,9 +37,9 @@ command_exists() {
 }
 
 
-# ------------------------------------------------------------
-# Operating system
-# ------------------------------------------------------------
+# ============================================================
+# Detect operating system
+# ============================================================
 
 OS="$(uname -s)"
 
@@ -59,13 +59,14 @@ esac
 info "Operating system: $PLATFORM"
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Find Python
-# ------------------------------------------------------------
+# ============================================================
 
 PYTHON=""
 
 for candidate in python3 python; do
+
     if command_exists "$candidate"; then
 
         VERSION="$("$candidate" -c \
@@ -79,12 +80,16 @@ for candidate in python3 python; do
             PYTHON="$candidate"
             break
         fi
+
     fi
+
 done
 
 
 if [[ -z "$PYTHON" ]]; then
+
     error "Python 3.10 or newer is required."
+
     echo ""
 
     if [[ "$PLATFORM" == "macOS" ]]; then
@@ -96,18 +101,22 @@ if [[ -z "$PYTHON" ]]; then
     fi
 
     exit 1
+
 fi
 
 success "$("$PYTHON" --version 2>&1)"
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Git
-# ------------------------------------------------------------
+# ============================================================
 
 if command_exists git; then
+
     success "Git"
+
 else
+
     error "Git is required."
 
     if [[ "$PLATFORM" == "macOS" ]]; then
@@ -118,12 +127,13 @@ else
     fi
 
     exit 1
+
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # ripgrep
-# ------------------------------------------------------------
+# ============================================================
 
 if command_exists rg; then
 
@@ -155,9 +165,9 @@ else
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Python virtual environment
-# ------------------------------------------------------------
+# ============================================================
 
 echo ""
 
@@ -166,53 +176,76 @@ VENV_DIR="$HOME/.local-code-agent-venv"
 info "Creating private Python environment..."
 
 if [[ ! -d "$VENV_DIR" ]]; then
+
     "$PYTHON" -m venv "$VENV_DIR"
+
 else
+
     info "Existing Python environment found."
+
 fi
 
 success "Python environment ready"
 
 
-# ------------------------------------------------------------
-# Install package into private venv
-# ------------------------------------------------------------
+# ============================================================
+# Install Python package
+# ============================================================
 
 info "Installing $APP_NAME..."
 
 "$VENV_DIR/bin/python" -m pip install --upgrade pip >/dev/null
+
 "$VENV_DIR/bin/python" -m pip install --upgrade . >/dev/null
 
 success "Python package installed"
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Install lca launcher
-# ------------------------------------------------------------
+# ============================================================
+
+#
+# We deliberately use ~/.local/bin.
+#
+# This keeps the actual Python environment private.
+#
+# ~/.local/bin/lca
+#       ↓
+# ~/.local-code-agent-venv/bin/lca
+#
 
 BIN_DIR="$HOME/.local/bin"
 LCA="$BIN_DIR/lca"
 
 mkdir -p "$BIN_DIR"
 
+
 cat > "$LCA" <<EOF
 #!/usr/bin/env bash
+
 exec "$VENV_DIR/bin/lca" "\$@"
 EOF
 
+
 chmod +x "$LCA"
 
+
 if [[ ! -x "$LCA" ]]; then
+
     error "Could not create lca executable."
+
     exit 1
+
 fi
+
 
 success "lca executable installed"
 
 
-# ------------------------------------------------------------
-# Configure shell PATH
-# ------------------------------------------------------------
+# ============================================================
+# Configure shell
+# ============================================================
 
 SHELL_NAME="$(basename "${SHELL:-}")"
 
@@ -223,19 +256,27 @@ case "$SHELL_NAME" in
         ;;
 
     bash)
+
         if [[ "$PLATFORM" == "macOS" ]]; then
             SHELL_CONFIG="$HOME/.bash_profile"
         else
             SHELL_CONFIG="$HOME/.bashrc"
         fi
+
         ;;
 
     *)
+
         SHELL_CONFIG=""
+
         ;;
 
 esac
 
+
+# ============================================================
+# Add ~/.local/bin to PATH
+# ============================================================
 
 PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 
@@ -250,11 +291,11 @@ if [[ -n "$SHELL_CONFIG" ]]; then
         echo "# Local Code Agent" >> "$SHELL_CONFIG"
         echo "$PATH_LINE" >> "$SHELL_CONFIG"
 
-        success "Added lca to $SHELL_CONFIG"
+        success "Added ~/.local/bin to $SHELL_CONFIG"
 
     else
 
-        success "lca already configured in PATH"
+        success "~/.local/bin already configured in $SHELL_CONFIG"
 
     fi
 
@@ -271,16 +312,21 @@ else
 fi
 
 
-# ------------------------------------------------------------
-# Make lca available NOW
-# ------------------------------------------------------------
+# ============================================================
+# IMPORTANT
+#
+# This only affects the installer process.
+# A child shell script cannot modify its parent's environment.
+#
+# The .zshrc/.bashrc change above handles future terminals.
+# ============================================================
 
 export PATH="$BIN_DIR:$PATH"
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Ollama
-# ------------------------------------------------------------
+# ============================================================
 
 echo ""
 echo "Checking Ollama..."
@@ -303,8 +349,10 @@ url = sys.argv[1].rstrip("/") + "/api/tags"
 
 try:
     with urllib.request.urlopen(url, timeout=3) as response:
+
         if response.status == 200:
             sys.exit(0)
+
 except Exception:
     pass
 
@@ -314,9 +362,9 @@ PY
 }
 
 
-# ------------------------------------------------------------
-# Try localhost
-# ------------------------------------------------------------
+# ============================================================
+# Try local Ollama
+# ============================================================
 
 if check_ollama "http://localhost:11434"; then
 
@@ -328,9 +376,9 @@ if check_ollama "http://localhost:11434"; then
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Ask for remote Ollama
-# ------------------------------------------------------------
+# ============================================================
 
 if [[ "$OLLAMA_FOUND" == false ]]; then
 
@@ -347,6 +395,8 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
 
     if [[ -n "$REMOTE_URL" ]]; then
 
+        # Add http:// automatically.
+
         if [[ "$REMOTE_URL" != http://* ]] && \
            [[ "$REMOTE_URL" != https://* ]]; then
 
@@ -354,11 +404,16 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
 
         fi
 
+
+        # Remove trailing slash.
+
         REMOTE_URL="${REMOTE_URL%/}"
+
 
         echo ""
 
         info "Checking $REMOTE_URL..."
+
 
         if check_ollama "$REMOTE_URL"; then
 
@@ -378,9 +433,9 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # No Ollama
-# ------------------------------------------------------------
+# ============================================================
 
 if [[ "$OLLAMA_FOUND" == false ]]; then
 
@@ -389,14 +444,17 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
     warning "Ollama is not currently reachable."
 
     echo ""
+
     echo "Install Ollama from:"
     echo ""
     echo "  https://ollama.com"
 
     echo ""
+
     echo "Then install the model:"
     echo ""
     echo "  ollama pull $MODEL_DEFAULT"
+
     echo ""
 
     OLLAMA_URL="http://localhost:11434"
@@ -404,9 +462,9 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Model
-# ------------------------------------------------------------
+# ============================================================
 
 MODEL="$MODEL_DEFAULT"
 
@@ -477,9 +535,13 @@ PY
                 warning "Ollama CLI is not installed on this computer."
 
                 echo ""
+
                 echo "If Ollama is remote, run this on that machine:"
+
                 echo ""
+
                 echo "  ollama pull $MODEL"
+
                 echo ""
 
             fi
@@ -491,9 +553,9 @@ PY
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Save configuration
-# ------------------------------------------------------------
+# ============================================================
 
 echo ""
 
@@ -549,9 +611,9 @@ PY
 success "Configuration saved"
 
 
-# ------------------------------------------------------------
-# Test lca directly
-# ------------------------------------------------------------
+# ============================================================
+# Test the actual launcher
+# ============================================================
 
 echo ""
 
@@ -564,12 +626,14 @@ if "$LCA" --version >/dev/null 2>&1; then
 
 else
 
-    error "lca could not be executed"
+    error "lca could not be executed."
 
     echo ""
-    echo "Trying direct executable:"
+
+    echo "Expected executable:"
     echo ""
     echo "  $LCA"
+
     echo ""
 
     exit 1
@@ -577,9 +641,9 @@ else
 fi
 
 
-# ------------------------------------------------------------
-# Verify command is available
-# ------------------------------------------------------------
+# ============================================================
+# Verify PATH
+# ============================================================
 
 if command_exists lca; then
 
@@ -587,24 +651,32 @@ if command_exists lca; then
 
 else
 
-    warning "lca is installed but this shell cannot find it."
+    warning "lca is installed but the current shell cannot find it."
 
     echo ""
+
+    echo "The installation itself is OK."
+
+    echo ""
+
     echo "Run:"
     echo ""
-    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo "  source ~/.zshrc"
+
     echo ""
+
     echo "Then:"
     echo ""
     echo "  lca doctor"
+
     echo ""
 
 fi
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Finished
-# ------------------------------------------------------------
+# ============================================================
 
 echo ""
 
@@ -614,36 +686,30 @@ echo "╚═══════════════════════�
 
 echo ""
 
-echo "You can use lca RIGHT NOW:"
+echo "IMPORTANT:"
+echo ""
+echo "If 'lca' is not found in this terminal, run:"
+echo ""
+echo "  source ~/.zshrc"
 
 echo ""
 
+echo "Then:"
+echo ""
 echo "  lca doctor"
 
 echo ""
 
-echo "Or from a project:"
-
+echo "From a project:"
 echo ""
-
 echo "  cd /path/to/your/project"
 echo "  lca"
 
 echo ""
 
 echo "Configuration:"
-
 echo ""
-
 echo "  lca config"
-
-echo ""
-
-echo "If a NEW terminal cannot find lca, run:"
-
-echo ""
-
-echo "  source ~/.zshrc"
 
 echo ""
 
