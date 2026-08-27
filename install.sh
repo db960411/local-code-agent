@@ -60,13 +60,12 @@ info "Operating system: $PLATFORM"
 
 
 # ------------------------------------------------------------
-# Python
+# Find Python
 # ------------------------------------------------------------
 
 PYTHON=""
 
 for candidate in python3 python; do
-
     if command_exists "$candidate"; then
 
         VERSION="$("$candidate" -c \
@@ -80,16 +79,12 @@ for candidate in python3 python; do
             PYTHON="$candidate"
             break
         fi
-
     fi
-
 done
 
 
 if [[ -z "$PYTHON" ]]; then
-
     error "Python 3.10 or newer is required."
-
     echo ""
 
     if [[ "$PLATFORM" == "macOS" ]]; then
@@ -101,9 +96,7 @@ if [[ -z "$PYTHON" ]]; then
     fi
 
     exit 1
-
 fi
-
 
 success "$("$PYTHON" --version 2>&1)"
 
@@ -115,7 +108,6 @@ success "$("$PYTHON" --version 2>&1)"
 if command_exists git; then
     success "Git"
 else
-
     error "Git is required."
 
     if [[ "$PLATFORM" == "macOS" ]]; then
@@ -126,7 +118,6 @@ else
     fi
 
     exit 1
-
 fi
 
 
@@ -165,22 +156,29 @@ fi
 
 
 # ------------------------------------------------------------
-# Install Python package
+# Python virtual environment
 # ------------------------------------------------------------
 
 echo ""
-
-info "Installing $APP_NAME..."
 
 VENV_DIR="$HOME/.local-code-agent-venv"
 
 info "Creating private Python environment..."
 
-"$PYTHON" -m venv "$VENV_DIR"
+if [[ ! -d "$VENV_DIR" ]]; then
+    "$PYTHON" -m venv "$VENV_DIR"
+else
+    info "Existing Python environment found."
+fi
 
 success "Python environment ready"
 
-info "Installing Local Code Agent..."
+
+# ------------------------------------------------------------
+# Install package into private venv
+# ------------------------------------------------------------
+
+info "Installing $APP_NAME..."
 
 "$VENV_DIR/bin/python" -m pip install --upgrade pip >/dev/null
 "$VENV_DIR/bin/python" -m pip install --upgrade . >/dev/null
@@ -189,7 +187,7 @@ success "Python package installed"
 
 
 # ------------------------------------------------------------
-# Find lca executable
+# Install lca launcher
 # ------------------------------------------------------------
 
 BIN_DIR="$HOME/.local/bin"
@@ -204,33 +202,17 @@ EOF
 
 chmod +x "$LCA"
 
-success "lca command installed"
-
-
-if [[ ! -f "$LCA" ]]; then
-
-    error "Could not find lca executable."
-
-    echo ""
-    echo "Expected:"
-    echo "  $LCA"
-    echo ""
-
+if [[ ! -x "$LCA" ]]; then
+    error "Could not create lca executable."
     exit 1
-
 fi
 
 success "lca executable installed"
 
 
 # ------------------------------------------------------------
-# Configure PATH
+# Configure shell PATH
 # ------------------------------------------------------------
-
-BIN_DIR="$HOME/.local/bin"
-LCA="$BIN_DIR/lca"
-
-mkdir -p "$BIN_DIR"
 
 SHELL_NAME="$(basename "${SHELL:-}")"
 
@@ -241,13 +223,11 @@ case "$SHELL_NAME" in
         ;;
 
     bash)
-
         if [[ "$PLATFORM" == "macOS" ]]; then
             SHELL_CONFIG="$HOME/.bash_profile"
         else
             SHELL_CONFIG="$HOME/.bashrc"
         fi
-
         ;;
 
     *)
@@ -264,7 +244,7 @@ if [[ -n "$SHELL_CONFIG" ]]; then
 
     touch "$SHELL_CONFIG"
 
-    if ! grep -Fq '$HOME/.local/bin' "$SHELL_CONFIG"; then
+    if ! grep -Fq 'export PATH="$HOME/.local/bin:$PATH"' "$SHELL_CONFIG"; then
 
         echo "" >> "$SHELL_CONFIG"
         echo "# Local Code Agent" >> "$SHELL_CONFIG"
@@ -278,13 +258,24 @@ if [[ -n "$SHELL_CONFIG" ]]; then
 
     fi
 
+else
+
+    warning "Could not automatically configure shell PATH."
+
+    echo ""
+    echo "Add this to your shell configuration:"
+    echo ""
+    echo "  $PATH_LINE"
+    echo ""
+
 fi
 
 
-# IMPORTANT:
-# Also update PATH in the current installer process.
+# ------------------------------------------------------------
+# Make lca available NOW
+# ------------------------------------------------------------
 
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$BIN_DIR:$PATH"
 
 
 # ------------------------------------------------------------
@@ -324,7 +315,7 @@ PY
 
 
 # ------------------------------------------------------------
-# Try local Ollama first
+# Try localhost
 # ------------------------------------------------------------
 
 if check_ollama "http://localhost:11434"; then
@@ -356,7 +347,6 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
 
     if [[ -n "$REMOTE_URL" ]]; then
 
-        # Automatically add http://.
         if [[ "$REMOTE_URL" != http://* ]] && \
            [[ "$REMOTE_URL" != https://* ]]; then
 
@@ -367,6 +357,7 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
         REMOTE_URL="${REMOTE_URL%/}"
 
         echo ""
+
         info "Checking $REMOTE_URL..."
 
         if check_ollama "$REMOTE_URL"; then
@@ -401,8 +392,8 @@ if [[ "$OLLAMA_FOUND" == false ]]; then
     echo "Install Ollama from:"
     echo ""
     echo "  https://ollama.com"
-    echo ""
 
+    echo ""
     echo "Then install the model:"
     echo ""
     echo "  ollama pull $MODEL_DEFAULT"
@@ -448,7 +439,6 @@ try:
 
 except Exception:
     pass
-
 PY
 )"
 
@@ -560,7 +550,7 @@ success "Configuration saved"
 
 
 # ------------------------------------------------------------
-# Test lca
+# Test lca directly
 # ------------------------------------------------------------
 
 echo ""
@@ -576,7 +566,38 @@ else
 
     error "lca could not be executed"
 
+    echo ""
+    echo "Trying direct executable:"
+    echo ""
+    echo "  $LCA"
+    echo ""
+
     exit 1
+
+fi
+
+
+# ------------------------------------------------------------
+# Verify command is available
+# ------------------------------------------------------------
+
+if command_exists lca; then
+
+    success "lca command is available"
+
+else
+
+    warning "lca is installed but this shell cannot find it."
+
+    echo ""
+    echo "Run:"
+    echo ""
+    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo ""
+    echo "Then:"
+    echo ""
+    echo "  lca doctor"
+    echo ""
 
 fi
 
@@ -593,26 +614,39 @@ echo "╚═══════════════════════�
 
 echo ""
 
-echo "IMPORTANT:"
-echo "Open a NEW terminal so the PATH change takes effect."
+echo "You can use lca RIGHT NOW:"
 
 echo ""
 
-echo "Then:"
+echo "  lca doctor"
+
 echo ""
+
+echo "Or from a project:"
+
+echo ""
+
 echo "  cd /path/to/your/project"
 echo "  lca"
 
 echo ""
 
-echo "Diagnostics:"
-echo ""
-echo "  lca doctor"
-
-echo ""
-
 echo "Configuration:"
+
 echo ""
+
 echo "  lca config"
+
+echo ""
+
+echo "If a NEW terminal cannot find lca, run:"
+
+echo ""
+
+echo "  source ~/.zshrc"
+
+echo ""
+
+echo "Have fun. 🦴"
 
 echo ""
