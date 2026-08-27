@@ -227,6 +227,11 @@ success "lca executable installed"
 # Configure PATH
 # ------------------------------------------------------------
 
+BIN_DIR="$HOME/.local/bin"
+LCA="$BIN_DIR/lca"
+
+mkdir -p "$BIN_DIR"
+
 SHELL_NAME="$(basename "${SHELL:-}")"
 
 case "$SHELL_NAME" in
@@ -252,13 +257,14 @@ case "$SHELL_NAME" in
 esac
 
 
+PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+
+
 if [[ -n "$SHELL_CONFIG" ]]; then
 
     touch "$SHELL_CONFIG"
 
-    PATH_LINE="export PATH=\"$BIN_DIR:\$PATH\""
-
-    if ! grep -Fq "$BIN_DIR" "$SHELL_CONFIG"; then
+    if ! grep -Fq '$HOME/.local/bin' "$SHELL_CONFIG"; then
 
         echo "" >> "$SHELL_CONFIG"
         echo "# Local Code Agent" >> "$SHELL_CONFIG"
@@ -272,21 +278,13 @@ if [[ -n "$SHELL_CONFIG" ]]; then
 
     fi
 
-else
-
-    warning "Could not automatically configure shell PATH."
-
-    echo ""
-    echo "Add this to your shell:"
-    echo ""
-    echo "  export PATH=\"$BIN_DIR:\$PATH\""
-    echo ""
-
 fi
 
 
-# Make lca available immediately in this shell.
-export PATH="$BIN_DIR:$PATH"
+# IMPORTANT:
+# Also update PATH in the current installer process.
+
+export PATH="$HOME/.local/bin:$PATH"
 
 
 # ------------------------------------------------------------
