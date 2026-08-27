@@ -172,7 +172,18 @@ echo ""
 
 info "Installing $APP_NAME..."
 
-"$PYTHON" -m pip install --user --upgrade . >/dev/null
+VENV_DIR="$HOME/.local-code-agent-venv"
+
+info "Creating private Python environment..."
+
+"$PYTHON" -m venv "$VENV_DIR"
+
+success "Python environment ready"
+
+info "Installing Local Code Agent..."
+
+"$VENV_DIR/bin/python" -m pip install --upgrade pip >/dev/null
+"$VENV_DIR/bin/python" -m pip install --upgrade . >/dev/null
 
 success "Python package installed"
 
@@ -181,9 +192,19 @@ success "Python package installed"
 # Find lca executable
 # ------------------------------------------------------------
 
-USER_BASE="$("$PYTHON" -m site --user-base)"
-BIN_DIR="$USER_BASE/bin"
+BIN_DIR="$HOME/.local/bin"
 LCA="$BIN_DIR/lca"
+
+mkdir -p "$BIN_DIR"
+
+cat > "$LCA" <<EOF
+#!/usr/bin/env bash
+exec "$VENV_DIR/bin/lca" "\$@"
+EOF
+
+chmod +x "$LCA"
+
+success "lca command installed"
 
 
 if [[ ! -f "$LCA" ]]; then
